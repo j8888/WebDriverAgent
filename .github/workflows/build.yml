@@ -25,6 +25,8 @@ jobs:
           test -n "$APP" || { echo "App not found"; exit 1; }
           mkdir Payload
           cp -R "$APP" Payload/
+          # Sideloadly không ký được file debug .dSYM nằm trong bundle
+          find Payload -name "*.dSYM" -prune -exec rm -rf {} +
           zip -qry WebDriverAgent.ipa Payload
 
       - uses: actions/upload-artifact@v4
