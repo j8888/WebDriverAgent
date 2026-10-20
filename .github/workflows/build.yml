@@ -1,13 +1,26 @@
-name: Build unsigned WebDriverAgent IPA
+name: Build unsigned WebDriverAgent IPA (iOS 16 và cũ hơn, Xcode 15)
+
+# Vì sao cần file này: bản dựng bằng macos-latest (Xcode mới) nhúng Testing.framework, framework này cần
+# lib_TestingInterop.dylib chỉ có trên iOS mới. Trên iPhone 8 Plus iOS 16.7 app WDA bị dyld đóng ngay khi mở
+# ("Library not loaded: @rpath/lib_TestingInterop.dylib") nên WDA không bao giờ kết nối.
+# Dựng bằng Xcode 15.x thì không có Testing.framework và chạy được trên iOS 16.
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
+
+      - name: Chọn Xcode 15
+        run: |
+          ls -d /Applications/Xcode*.app
+          X=$(ls -d /Applications/Xcode_15*.app 2>/dev/null | sort -V | tail -n 1)
+          test -n "$X" || { echo "Runner này không có Xcode 15.x"; exit 1; }
+          sudo xcode-select -s "$X"
+          xcodebuild -version
 
       - name: Build WebDriverAgentRunner (unsigned, device)
         run: |
@@ -23,6 +36,8 @@ jobs:
         run: |
           APP=$(find build/Build/Products -name "WebDriverAgentRunner-Runner.app" -maxdepth 3 | head -n 1)
           test -n "$APP" || { echo "App not found"; exit 1; }
+          # Bản này không được chứa Testing.framework (nếu có nghĩa là vẫn dựng bằng Xcode mới)
+          if [ -d "$APP/Frameworks/Testing.framework" ]; then echo "Còn Testing.framework: không chạy được trên iOS 16"; exit 1; fi
           mkdir Payload
           cp -R "$APP" Payload/
           # Sideloadly không ký được file debug .dSYM nằm trong bundle
@@ -31,5 +46,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: WebDriverAgent-ipa
+          name: WebDriverAgent-ipa-ios16
           path: WebDriverAgent.ipa
